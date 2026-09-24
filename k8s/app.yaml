@@ -1,0 +1,93 @@
+# Runtime for this project, applied by the shared pipeline's deploy task
+# after every green build (the task also pins the image to the platform's
+# resolved registry, so the default here is only a bootstrap value).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iso-worker-c
+  labels:
+    app.kubernetes.io/name: iso-worker-c
+    app.kubernetes.io/part-of: iso-worker-c
+    app.openshift.io/runtime: quarkus
+    backstage.io/kubernetes-id: iso-worker-c
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: iso-worker-c
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: iso-worker-c
+        app.kubernetes.io/part-of: iso-worker-c
+        backstage.io/kubernetes-id: iso-worker-c
+    spec:
+      imagePullSecrets:
+        - name: quay-pull-secret
+      containers:
+        - name: iso-worker-c
+          # Bootstrap tag only — the deploy-app task pins each PipelineRun's
+          # immutable revision tag and sets IfNotPresent (V6 P4.1).
+          image: quay.io/rhoai3-coding-demo/iso-worker-c:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iso-worker-c
+  labels:
+    app.kubernetes.io/name: iso-worker-c
+    backstage.io/kubernetes-id: iso-worker-c
+spec:
+  selector:
+    app.kubernetes.io/name: iso-worker-c
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: iso-worker-c
+  labels:
+    app.kubernetes.io/name: iso-worker-c
+    backstage.io/kubernetes-id: iso-worker-c
+spec:
+  to:
+    kind: Service
+    name: iso-worker-c
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
