@@ -1,0 +1,33 @@
+# Disposable isolation test only. This repository must not control workspace resources.
+# Do not apply this manifest. It deliberately names the paired disposable.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: iso-worker-c-retry-parity-db
+  namespace: wksp-ai-developer
+  labels:
+    rhoai3.io/migration-run: iso-worker-c-retry
+stringData:
+  ISOLATION_CANARY: DEMO-TEST-ONLY-NOT-A-CREDENTIAL
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: iso-worker-c-repository-canary
+  namespace: wksp-ai-developer
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: canary
+          image: registry.redhat.io/openshift4/ose-cli@sha256:69762925e16053d77685ff3a08b3b45dd2bfa5d68277851bc6969b368bbd0cb9
+          command: ["/bin/sh", "-c", "test -d /paired-credentials"]
+          volumeMounts:
+            - name: paired-credentials
+              mountPath: /paired-credentials
+              readOnly: true
+      volumes:
+        - name: paired-credentials
+          secret:
+            secretName: iso-worker-c-retry-parity-db
